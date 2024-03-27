@@ -14,6 +14,7 @@
 #include "megawifi.h"
 #include "jcart.h"
 #include "blastem.h"
+#include "kinetoscope/emulator-patches/kinetoscope.h"
 
 #define DOM_TITLE_START 0x120
 #define DOM_TITLE_END 0x150
@@ -337,6 +338,47 @@ void add_memmap_header(rom_info *info, uint8_t *rom, uint32_t size, memmap_chunk
 		} else {
 			warning("ROM uses MegaWiFi, but it is disabled\n");
 		}
+		return;
+	} else if(!memcmp("SEGA KINETOSCOPE", rom + 0x100, strlen("SEGA KINETOSCOPE"))) {
+		info->mapper_type = MAPPER_NONE;
+		info->map_chunks = base_chunks + 3;
+		info->map = malloc(sizeof(memmap_chunk) * info->map_chunks);
+		memset(info->map, 0, sizeof(memmap_chunk)*3);
+		memcpy(info->map+3, base_map, sizeof(memmap_chunk) * base_chunks);
+
+		info->map[0].start = 0x200000;
+		info->map[0].end   = 0x400000;
+		info->map[0].mask  = 0x1FFFFF;
+		info->map[0].flags = MMAP_READ;
+		uint32_t sram_size = info->map[0].end - info->map[0].start;
+		void* sram_buffer = info->map[0].buffer = calloc(sram_size, 1);
+
+		// In hardware, this whole range will trigger the /TIME signal.
+		info->map[1].start = 0xA13000;
+		info->map[1].end   = 0xA13100;
+		// In our hardware, we use A1-A3 to address various special ports.  A0 (low
+		// byte / high byte) doesn't exist in the cartridge interface.  But we
+		// effectively respond to changes in the bottom 5 bits.
+		// Therefore our port address is 0xA13000 and the mask is 0x01F.
+		// In real hardware, the range would wrap around and 0x...00, 0x...20,
+		// 0x...40, ... would all map to the same port.
+		info->map[1].mask  = 0x00001F;
+
+		info->map[2].start = 0x000000;
+		info->map[2].end   = 0x200000;
+		if (rom_end < info->map[2].end) {
+			info->map[2].end = rom_end;
+		}
+		info->map[2].mask  = 0x1FFFFF;
+		info->map[2].flags = MMAP_READ;
+		info->map[2].buffer = rom;
+
+		info->map[1].write_16 = kinetoscope_write_16;
+		info->map[1].write_8 = kinetoscope_write_8;
+		info->map[1].read_16 = kinetoscope_read_16;
+		info->map[1].read_8 = kinetoscope_read_8;
+
+		kinetoscope_init(sram_buffer, sram_size);
 		return;
 	} else if (has_ram_header(rom, size)) {
 		uint32_t ram_start = read_ram_header(info, rom);
