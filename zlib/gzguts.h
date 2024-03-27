@@ -3,6 +3,17 @@
  * For conditions of distribution and use, see copyright notice in zlib.h
  */
 
+#if defined(__MINGW32__)
+# include <wchar.h>  // _wopen
+# include <sys/types.h>
+# include <unistd.h>
+int open(const char *pathname, int flags, mode_t mode);
+off_t lseek(int fd, off_t offset, int whence);
+ssize_t read(int fd, void *buf, size_t count);
+ssize_t write(int fd, const void *buf, size_t count);
+int close(int fd);
+#endif
+
 #ifdef _LARGEFILE64_SOURCE
 #  ifndef _LARGEFILE_SOURCE
 #    define _LARGEFILE_SOURCE 1

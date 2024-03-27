@@ -58,7 +58,7 @@ endif
 
 
 core: $(OBJ)
-	$(MAKE) $(target) OS=$(OS) CC=$(CC) CPU=$(ABI) LIBRETRO=$(LIBRETRO)
+	$(MAKE) $(target) OS=$(OS) CC=$(CC) CPU=$(ABI) LIBRETRO=$(LIBRETRO) PLATFORM=$(platform)
 	cp -v $(target) $(libname)
 
 install: $(libname)

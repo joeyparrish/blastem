@@ -3,28 +3,52 @@
 set -e
 
 if [ -z "$OS" ]; then
-	OS=`uname -s`
+  echo "\$OS should be Linux, Darwin, or Win64"
+  exit 1
 fi
 
-if [ $OS = "Linux" ]; then
+if [ $OS = "Linux" -o $OS = "Darwin" ]; then
 	cd sdl
 	./configure
-	make all
+	make build/libSDL2.la
 	cd ..
 	rm -rf lib
 	mkdir lib
-	cp sdl/build/.libs/libSDL2-*.so.*.*.* lib
-	sdl=`ls lib`
-	link=`echo $sdl | sed -E 's/(so\.[0-9]*).*/\1/'`
+	if [ $OS = "Linux" ]; then
+		cp sdl/build/.libs/libSDL2-*.so.*.*.* lib
+		sdl=`ls lib`
+		link=`echo $sdl | sed -E 's/(so\.[0-9]*).*/\1/'`
+		link2="libSDL2.so"
+	else
+		cp sdl/build/.libs/libSDL2-*.*.*.dylib lib
+		sdl=`ls lib`
+		link=`echo $sdl | sed -E 's/(-[0-9]*).*(\.dylib)/\1\2/'`
+		link2="libSDL2.dylib"
+	fi
 	cd lib
 	ln -s "$sdl" "$link"
-	ln -s "$sdl" libSDL2.so
+	ln -s "$sdl" "$link2"
 	cd ..
 	cd glew
 	make all
 	cd ..
 fi
-echo "Path is: $PATH"
+
+if [ $OS = "Win64" ]; then
+	OS_FLAGS="--host=x86_64-w64-mingw32 --disable-pthreads"
+else
+	OS_FLAGS=""
+fi
+
+cd curl
+./configure \
+    --enable-static --disable-shared --without-ssl \
+    --without-libpsl --without-zstd --without-brotli \
+    --without-libidn2 --without-librtmp \
+    --without-zlib --without-nghttp2 --disable-ldap $OS_FLAGS
+make -C lib
+cd ..
+
 if [ $OS = "Win64" ]; then
 	make PORTABLE=1 OS=Windows CPU=x86_64 clean all
 	SDLDLLPATH=sdl/x86_64-w64-mingw32/bin
@@ -32,53 +56,20 @@ else
 	make PORTABLE=1 clean all
 	SDLDLLPATH=sdl/i686-w64-mingw32/bin
 fi
-make menu.bin tmss.md
-if [ $OS = "Windows" -o $OS = "Win64" ]; then
+
+if [ $OS = "Win64" ]; then
 	binaries="dis.exe zdis.exe vgmplay.exe blastem.exe $SDLDLLPATH/SDL2.dll"
-	verstr=`sed -E -n 's/^[^B]+BLASTEM_VERSION "([^"]+)"/blastem \1/p' blastem.c`
-	txt=".txt"
 else
-	binaries="dis zdis vgmplay blastem termhelper"
-	if [ $OS = "Darwin" ]; then
-		binaries="$binaries Frameworks"
-	else
-		binaries="$binaries lib"
-	fi
-	verstr=`./blastem -v`
-	txt=""
+	binaries="dis zdis vgmplay blastem termhelper lib"
 fi
-binaries="$binaries menu.bin tmss.md"
-ver=`echo $verstr | awk '/blastem/ { gsub(/\r/, "", $2); print $2 }'`
-if [ $OS = "Windows" ]; then
-	suffix='-win32'
-elif [ $OS = "Win64" ]; then
-	suffix='-win64'
-elif [ $OS = "Darwin" ]; then
-	suffix='-osx'
-else
-	suffix=`file ./blastem | sed -E 's/^[^:]*: [^ ]* ([0-9]*)-bit .*/\1/'`
-fi
-dir="blastem${suffix}-${ver}"
-echo $dir
+
+dir="blastem-0.6.2-kinetoscope"
 rm -rf "$dir"
 mkdir "$dir"
+
 cp -r $binaries shaders images default.cfg rom.db gamecontrollerdb.txt systems.cfg "$dir"
 for file in README COPYING CHANGELOG; do
-	cp "$file" "$dir"/"$file$txt"
+	cp "$file" "$dir"/"$file".txt
 done
-if [ $OS = "Darwin" ]; then
-	cp SDL-LICENSE "$dir"
-else
-	cp sdl/COPYING.txt "$dir"/SDL-LICENSE$txt
-fi
-cp glew/LICENSE.txt "$dir"/GLEW-LICENSE$txt
-
-if [ $OS = "Windows" -o $OS = "Win64" ]; then
-	rm -f "${dir}.zip"
-	zip -r "${dir}.zip" "$dir"
-	echo "${dir}.zip"
-else
-	rm -f "${dir}.tar.gz"
-	tar -cvzf "${dir}.tar.gz" "$dir"
-	echo "${dir}.tar.gz"
-fi
+cp sdl/LICENSE.txt "$dir"/SDL-LICENSE.txt
+cp glew/LICENSE.txt "$dir"/GLEW-LICENSE.txt

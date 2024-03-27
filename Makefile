@@ -23,11 +23,11 @@ ifeq ($(CPU),i686)
 CC:=i686-w64-mingw32-gcc-win32
 WINDRES:=i686-w64-mingw32-windres
 GLUDIR:=Win32
-SDL2_PREFIX:="sdl/i686-w64-mingw32"
+SDL2_PREFIX:=sdl/i686-w64-mingw32
 else
 CC:=x86_64-w64-mingw32-gcc-win32
 WINDRES:=x86_64-w64-mingw32-windres
-SDL2_PREFIX:="sdl/x86_64-w64-mingw32"
+SDL2_PREFIX:=sdl/x86_64-w64-mingw32
 GLUDIR:=x64
 endif
 GLEW32S_LIB:=$(GLEW_PREFIX)/lib/Release/$(GLUDIR)/glew32s.lib
@@ -96,10 +96,11 @@ LDFLAGS:=-lm glew/lib/libGLEW.a
 endif
 
 ifeq ($(OS),Darwin)
-SDL_INCLUDE_PATH:=Frameworks/SDL2.framework/Headers
-CFLAGS+=  -mmacosx-version-min=10.10
-LDFLAGS+= -mmacosx-version-min=10.10
-FIXUP:=install_name_tool -change @rpath/SDL2.framework/Versions/A/SDL2 @executable_path/Frameworks/SDL2.framework/Versions/A/SDL2
+SDL_INCLUDE_PATH:=sdl/include
+LDFLAGS+= -Llib -lSDL2 -framework OpenGL
+# These support font_mac:
+LDFLAGS+= -framework Foundation -framework AppKit
+FIXUP:= install_name_tool -change /usr/local/lib/libSDL2-2.0.0.dylib @executable_path/lib/libSDL2.dylib
 else
 SDL_INCLUDE_PATH:=sdl/include
 LDFLAGS+= -Wl,-rpath='$$ORIGIN/lib' -Llib -lSDL2
@@ -128,6 +129,35 @@ endif
 
 endif #PORTABLE
 endif #Windows
+
+
+# For the kinetscope symlink in this folder
+CFLAGS+= -I.
+
+ifneq ($(PLATFORM),emscripten)
+# Curl, but only if it's not an emscripten environment
+ifdef PORTABLE
+# Static libcurl
+CFLAGS+= -Icurl/include -DCURL_STATICLIB
+LDFLAGS+= curl/lib/.libs/libcurl.a
+else
+# System libcurl
+LDFLAGS+= $(shell curl-config --libs)
+endif
+endif
+
+ifneq ($(OS),Windows)
+# Pthread is required, except on Windows
+CFLAGS+= -pthread
+LDFLAGS+= -pthread
+endif
+
+ifeq ($(OS),Darwin)
+# Needed for curl on macOS?
+LDFLAGS+= -framework SystemConfiguration
+endif #Darwin
+
+
 
 ifndef OPT
 ifdef DEBUG
@@ -221,10 +251,12 @@ endif
 
 MAINOBJS=blastem.o system.o genesis.o debug.o gdb_remote.o vdp.o $(RENDEROBJS) io.o romdb.o hash.o menu.o xband.o \
 	realtec.o i2c.o nor.o sega_mapper.o multi_game.o megawifi.o $(NET) serialize.o $(TERMINAL) $(CONFIGOBJS) gst.o \
+	kinetoscope.o \
 	$(M68KOBJS) $(TRANSOBJS) $(AUDIOOBJS) saves.o zip.o bindings.o jcart.o gen_player.o
 
 LIBOBJS=libblastem.o system.o genesis.o debug.o gdb_remote.o vdp.o io.o romdb.o hash.o xband.o realtec.o \
 	i2c.o nor.o sega_mapper.o multi_game.o megawifi.o $(NET) serialize.o $(TERMINAL) $(CONFIGOBJS) gst.o \
+	kinetoscope.o \
 	$(M68KOBJS) $(TRANSOBJS) $(AUDIOOBJS) saves.o jcart.o rom.db.o gen_player.o $(LIBZOBJS)
 	
 ifdef NONUKLEAR
@@ -365,8 +397,11 @@ m68k.c : m68k.cpu cpu_dsl.py
 %.o : %.m
 	$(CC) $(CFLAGS) -c -o $@ $<
 
+kinetoscope.o : kinetoscope/emulator-patches/kinetoscope.c kinetoscope/emulator-patches/fetch.c
+	$(CC) $(CFLAGS) -c -o $@ $<
+
 %.png : %.xcf
-	xcf2png $< > $@
+	convert $< $@
 
 %.tiles : %.spec
 	./img2tiles.py -s $< $@
