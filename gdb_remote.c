@@ -582,6 +582,6 @@ void gdb_remote_init(void)
 	}
 	socket_close(listen_sock);
 #else
-	disable_stdout_messages();
+	//disable_stdout_messages();
 #endif
 }

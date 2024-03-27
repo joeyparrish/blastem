@@ -109,6 +109,16 @@ endif
 endif #Darwin
 CFLAGS+= -I$(SDL_INCLUDE_PATH)
 
+# Static libcurl for kinetoscope emulation
+CFLAGS+= -Icurl/include
+LDFLAGS+= curl/lib/.libs/libcurl.a
+# Static liblz4 for kinetoscope emulation
+CFLAGS+= -Ilz4/lib
+LDFLAGS+= lz4/lib/liblz4.a
+# Pthread for kinetoscope emulation
+CFLAGS+= -pthread
+LDFLAGS+= -pthread
+
 else
 ifeq ($(MAKECMDGOALS),libblastem.$(SO))
 LDFLAGS:=-lm
@@ -125,6 +135,14 @@ ifneq ($(LIBRETRO),1)
 LDFLAGS+= -framework OpenGL -framework AppKit
 endif
 endif
+
+# System libcurl for Kinetoscope emulation
+LDFLAGS+= $(shell curl-config --libs)
+# System liblz4 for Kinetoscope emulation
+LDFLAGS+= -llz4
+# Pthread for kinetoscope emulation
+CFLAGS+= -pthread
+LDFLAGS+= -pthread
 
 endif #PORTABLE
 endif #Windows
@@ -221,6 +239,7 @@ endif
 
 MAINOBJS=blastem.o system.o genesis.o debug.o gdb_remote.o vdp.o $(RENDEROBJS) io.o romdb.o hash.o menu.o xband.o \
 	realtec.o i2c.o nor.o sega_mapper.o multi_game.o megawifi.o $(NET) serialize.o $(TERMINAL) $(CONFIGOBJS) gst.o \
+	kinetoscope/emulator-patches/kinetoscope.o \
 	$(M68KOBJS) $(TRANSOBJS) $(AUDIOOBJS) saves.o zip.o bindings.o jcart.o gen_player.o
 
 LIBOBJS=libblastem.o system.o genesis.o debug.o gdb_remote.o vdp.o io.o romdb.o hash.o xband.o realtec.o \
@@ -276,6 +295,8 @@ endif
 ifeq ($(MAKECMDGOALS),libblastem.$(SO))
 CFLAGS+= -fpic -DIS_LIB
 endif
+
+CFLAGS+= -I. -Ikinetoscope/software/player/inc/
 
 all : $(ALL)
 
@@ -366,7 +387,7 @@ m68k.c : m68k.cpu cpu_dsl.py
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 %.png : %.xcf
-	xcf2png $< > $@
+	convert $< $@
 
 %.tiles : %.spec
 	./img2tiles.py -s $< $@

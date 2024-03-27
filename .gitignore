@@ -1,0 +1,8 @@
+*.o
+*.sw*
+blastem
+dis
+termhelper
+vgmplay
+zdis
+kinetoscope

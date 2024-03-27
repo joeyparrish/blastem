@@ -24,6 +24,18 @@ if [ $OS = "Linux" ]; then
 	make all
 	cd ..
 fi
+
+cd curl
+./configure \
+    --enable-static --disable-shared --without-ssl \
+    --without-libpsl --without-zstd --without-brotli
+make
+cd ..
+
+cd lz4
+make
+cd ..
+
 echo "Path is: $PATH"
 if [ $OS = "Win64" ]; then
 	make PORTABLE=1 OS=Windows CPU=x86_64 clean all
@@ -32,10 +44,8 @@ else
 	make PORTABLE=1 clean all
 	SDLDLLPATH=sdl/i686-w64-mingw32/bin
 fi
-make menu.bin tmss.md
 if [ $OS = "Windows" -o $OS = "Win64" ]; then
 	binaries="dis.exe zdis.exe vgmplay.exe blastem.exe $SDLDLLPATH/SDL2.dll"
-	verstr=`sed -E -n 's/^[^B]+BLASTEM_VERSION "([^"]+)"/blastem \1/p' blastem.c`
 	txt=".txt"
 else
 	binaries="dis zdis vgmplay blastem termhelper"
@@ -44,11 +54,9 @@ else
 	else
 		binaries="$binaries lib"
 	fi
-	verstr=`./blastem -v`
 	txt=""
 fi
-binaries="$binaries menu.bin tmss.md"
-ver=`echo $verstr | awk '/blastem/ { gsub(/\r/, "", $2); print $2 }'`
+ver="0.6.2-kinetoscope"
 if [ $OS = "Windows" ]; then
 	suffix='-win32'
 elif [ $OS = "Win64" ]; then
@@ -66,11 +74,7 @@ cp -r $binaries shaders images default.cfg rom.db gamecontrollerdb.txt systems.c
 for file in README COPYING CHANGELOG; do
 	cp "$file" "$dir"/"$file$txt"
 done
-if [ $OS = "Darwin" ]; then
-	cp SDL-LICENSE "$dir"
-else
-	cp sdl/COPYING.txt "$dir"/SDL-LICENSE$txt
-fi
+cp sdl/LICENSE.txt "$dir"/SDL-LICENSE$txt
 cp glew/LICENSE.txt "$dir"/GLEW-LICENSE$txt
 
 if [ $OS = "Windows" -o $OS = "Win64" ]; then
